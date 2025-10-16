@@ -2645,6 +2645,9 @@
                                     }
                                 }
                             });
+                            if (playlist.length > 1)
+                                first.playlist = playlist;
+                            Lampa.Player.play(first);
                             Lampa.Player.playlist(playlist);
                         } else {
                             Lampa.Player.playlist([first]);
