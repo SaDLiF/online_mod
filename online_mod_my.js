@@ -2785,10 +2785,11 @@ function buildPlaylist(items, currentElement, select_title, getStreamFunction) {
                     playlist.push(cell);
                   }
                 });
-                Lampa.Player.playlist(playlist);
-              } else {
-                Lampa.Player.playlist([first]);
               }
+
+              if (playlist.length > 1) first.playlist = playlist;
+              Lampa.Player.play(first);
+              Lampa.Player.playlist(playlist);
 
               if (viewed.indexOf(hash_file) == -1) {
                 viewed.push(hash_file);
