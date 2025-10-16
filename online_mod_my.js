@@ -2626,60 +2626,67 @@
                                 Lampa.Player.play(first);
                                 Lampa.Player.playlist(playlist);
                             } else {
-                                // Для внешнего плеера - полностью отдельные объекты
-                                var playlist = [];
+                                // Для внешнего плеера - загружаем ВСЕ серии сразу
+                                var allPromises = [];
+                                var playlistItems = [];
                                 
-                                // Создаем копию first без ссылок на оригинальные объекты
-                                var firstCopy = {
-                                    url: first.url,
-                                    quality: first.quality,
-                                    subtitles: first.subtitles,
-                                    timeline: first.timeline,
-                                    title: first.title
-                                };
-                                playlist.push(firstCopy);
-                                
-                                var pendingRequests = items.length - 1;
-                                
-                                items.forEach(function(elem) {
-                                    if (elem !== element) {
-                                        var cell = {
-                                            timeline: elem.timeline,
-                                            title: elem.title,
-                                            url: '',
-                                            quality: null,
-                                            subtitles: null
-                                        };
-                                        playlist.push(cell);
-                                        
-                                        getStream(elem, function(res) {
-                                            cell.url = component.getDefaultQuality(res.qualitys, res.stream);
-                                            cell.quality = component.renameQualityMap(res.qualitys);
-                                            cell.subtitles = res.subtitles;
-                                            
-                                            pendingRequests--;
-                                            if (pendingRequests === 0) {
-                                                // Все загружено - запускаем воспроизведение
-                                                Lampa.Player.play(firstCopy);
-                                                Lampa.Player.playlist(playlist);
-                                            }
-                                        }, function() {
-                                            cell.url = '';
-                                            
-                                            pendingRequests--;
-                                            if (pendingRequests === 0) {
-                                                Lampa.Player.play(firstCopy);
-                                                Lampa.Player.playlist(playlist);
-                                            }
-                                        });
-                                    }
+                                // Создаем промисы для всех элементов
+                                items.forEach(function(elem, index) {
+                                    var promise = new Promise(function(resolve) {
+                                        if (elem === element) {
+                                            // Текущий элемент - у нас уже есть first
+                                            resolve({
+                                                url: first.url,
+                                                quality: first.quality,
+                                                subtitles: first.subtitles,
+                                                timeline: elem.timeline,
+                                                title: elem.title
+                                            });
+                                        } else {
+                                            // Остальные элементы - загружаем поток
+                                            getStream(elem, function(res) {
+                                                resolve({
+                                                    url: component.getDefaultQuality(res.qualitys, res.stream),
+                                                    quality: component.renameQualityMap(res.qualitys),
+                                                    subtitles: res.subtitles,
+                                                    timeline: elem.timeline,
+                                                    title: elem.title
+                                                });
+                                            }, function() {
+                                                resolve({
+                                                    url: '',
+                                                    timeline: elem.timeline,
+                                                    title: elem.title,
+                                                    quality: null,
+                                                    subtitles: null
+                                                });
+                                            });
+                                        }
+                                    });
+                                    allPromises.push(promise);
                                 });
                                 
-                                // Если нет других элементов
-                                if (pendingRequests === 0) {
-                                    Lampa.Player.play(firstCopy);
-                                    Lampa.Player.playlist(playlist);
-                                }
+                                // Ждем загрузки ВСЕХ серий
+                                Promise.all(allPromises).then(function(results) {
+                                    // Формируем полный плейлист
+                                    var fullPlaylist = results;
+                                    
+                                    // Находим индекс текущей серии для старта
+                                    var currentIndex = items.findIndex(function(elem) {
+                                        return elem === element;
+                                    });
+                                    
+                                    // Запускаем плеер с полным плейлистом
+                                    if (fullPlaylist.length > 0) {
+                                        Lampa.Player.play(fullPlaylist[currentIndex]);
+                                        Lampa.Player.playlist(fullPlaylist);
+                                        console.log('Передан плейлист из', fullPlaylist.length, 'серий');
+                                    }
+                                }).catch(function(error) {
+                                    console.error('Ошибка загрузки плейлиста:', error);
+                                    // Fallback - запускаем только текущую серию
+                                    Lampa.Player.play(first);
+                                });
                             }
                         } else {
                             // Для фильмов
