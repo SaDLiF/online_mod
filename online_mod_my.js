@@ -2597,12 +2597,14 @@
                         // 'native', 'mx', 'external' и т.д.
 
                         if (element.season) {
-                            var playlist = [first]; // Начинаем с текущего элемента
+                            var playlist = [];
                             
                             if (defaultPlayer === 'builtin') {
-                                // Для встроенного плеера - ленивая загрузка
+                                // Для встроенного плеера
                                 items.forEach(function(elem) {
-                                    if (elem !== element) {
+                                    if (elem === element) {
+                                        playlist.push(first);
+                                    } else {
                                         var cell = {
                                             url: function(call) {
                                                 getStream(elem, function(elem) {
@@ -2622,17 +2624,23 @@
                                     }
                                 });
                                 
-                                if (playlist.length > 1) {
-                                    first.playlist = playlist;
-                                }
                                 Lampa.Player.play(first);
                                 Lampa.Player.playlist(playlist);
                             } else {
-                                // Для внешнего плеера - загружаем все ссылки перед воспроизведением
+                                // Для внешнего плеера - создаем копию first без циклических ссылок
+                                var firstCopy = {
+                                    url: first.url,
+                                    quality: first.quality,
+                                    subtitles: first.subtitles,
+                                    timeline: first.timeline,
+                                    title: first.title
+                                };
+                                
+                                playlist.push(firstCopy);
+                                
                                 var pendingRequests = 0;
                                 var totalRequests = items.length - 1;
                                 
-                                // Сначала создаем все ячейки
                                 items.forEach(function(elem) {
                                     if (elem !== element) {
                                         var cell = {
@@ -2644,7 +2652,6 @@
                                         };
                                         playlist.push(cell);
                                         
-                                        // Запускаем загрузку потока
                                         pendingRequests++;
                                         getStream(elem, function(res) {
                                             cell.url = component.getDefaultQuality(res.qualitys, res.stream);
@@ -2661,26 +2668,17 @@
                                 function checkAllLoaded() {
                                     pendingRequests--;
                                     if (pendingRequests === 0) {
-                                        // Все потоки загружены, можно запускать
-                                        if (playlist.length > 1) {
-                                            first.playlist = playlist;
-                                        }
-                                        Lampa.Player.play(first);
+                                        Lampa.Player.play(firstCopy);
                                         Lampa.Player.playlist(playlist);
                                     }
                                 }
                                 
-                                // Если нет других элементов для загрузки
                                 if (totalRequests === 0) {
-                                    if (playlist.length > 1) {
-                                        first.playlist = playlist;
-                                    }
-                                    Lampa.Player.play(first);
+                                    Lampa.Player.play(firstCopy);
                                     Lampa.Player.playlist(playlist);
                                 }
                             }
                         } else {
-                            // Для фильмов (без сезонов)
                             Lampa.Player.play(first);
                             Lampa.Player.playlist([first]);
                         }
