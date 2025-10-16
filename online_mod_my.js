@@ -2597,102 +2597,61 @@
                         // 'native', 'mx', 'external' и т.д.
 
                         if (element.season) {
-                            if (defaultPlayer === 'builtin') {
-                                // Для встроенного плеера - оригинальная логика
+                            // Сначала загружаем ВСЕ данные для внешнего плеера
+                            var promises = [];
+                            
+                            items.forEach(function(elem) {
+                                if (elem !== element && !elem.stream) {
+                                    // Загружаем только те, у которых нет данных
+                                    var promise = new Promise(function(resolve) {
+                                        getStream(elem, function() {
+                                            resolve(); // Данные теперь в elem.stream
+                                        }, function() {
+                                            resolve(); // Все равно разрешаем
+                                        });
+                                    });
+                                    promises.push(promise);
+                                }
+                            });
+                            
+                            // Ждем загрузки всех данных
+                            Promise.all(promises).then(function() {
+                                // Теперь все elem.stream должны быть заполнены
                                 var playlist = [];
+                                
                                 items.forEach(function(elem) {
-                                    if (elem === element) {
+                                    if (elem == element) {
                                         playlist.push(first);
                                     } else {
-                                        var cell = {
-                                            url: function(call) {
-                                                getStream(elem, function(elem) {
-                                                    cell.url = component.getDefaultQuality(elem.qualitys, elem.stream);
-                                                    cell.quality = component.renameQualityMap(elem.qualitys);
-                                                    cell.subtitles = elem.subtitles;
-                                                    call();
-                                                }, function() {
-                                                    cell.url = '';
-                                                    call();
-                                                });
-                                            },
-                                            timeline: elem.timeline,
-                                            title: elem.title
-                                        };
-                                        playlist.push(cell);
-                                    }
-                                });
-                                
-                                Lampa.Player.play(first);
-                                Lampa.Player.playlist(playlist);
-                            } else {
-                                // Для внешнего плеера - загружаем ВСЕ серии сразу
-                                var allPromises = [];
-                                var playlistItems = [];
-                                
-                                // Создаем промисы для всех элементов
-                                items.forEach(function(elem, index) {
-                                    var promise = new Promise(function(resolve) {
-                                        if (elem === element) {
-                                            // Текущий элемент - у нас уже есть first
-                                            resolve({
-                                                url: first.url,
-                                                quality: first.quality,
-                                                subtitles: first.subtitles,
+                                        if (elem.stream && elem.qualitys) {
+                                            playlist.push({
+                                                url: component.getDefaultQuality(elem.qualitys, elem.stream),
+                                                quality: component.renameQualityMap(elem.qualitys),
+                                                subtitles: elem.subtitles,
                                                 timeline: elem.timeline,
                                                 title: elem.title
                                             });
                                         } else {
-                                            // Остальные элементы - загружаем поток
-                                            getStream(elem, function(res) {
-                                                resolve({
-                                                    url: component.getDefaultQuality(res.qualitys, res.stream),
-                                                    quality: component.renameQualityMap(res.qualitys),
-                                                    subtitles: res.subtitles,
-                                                    timeline: elem.timeline,
-                                                    title: elem.title
-                                                });
-                                            }, function() {
-                                                resolve({
-                                                    url: '',
-                                                    timeline: elem.timeline,
-                                                    title: elem.title,
-                                                    quality: null,
-                                                    subtitles: null
-                                                });
+                                            playlist.push({
+                                                url: '',
+                                                timeline: elem.timeline,
+                                                title: elem.title,
+                                                quality: null,
+                                                subtitles: null
                                             });
                                         }
-                                    });
-                                    allPromises.push(promise);
+                                    }
                                 });
                                 
-                                // Ждем загрузки ВСЕХ серий
-                                Promise.all(allPromises).then(function(results) {
-                                    // Формируем полный плейлист
-                                    var fullPlaylist = results;
-                                    
-                                    // Находим индекс текущей серии для старта
-                                    var currentIndex = items.findIndex(function(elem) {
-                                        return elem === element;
-                                    });
-                                    
-                                    // Запускаем плеер с полным плейлистом
-                                    if (fullPlaylist.length > 0) {
-                                        Lampa.Player.play(fullPlaylist[currentIndex]);
-                                        Lampa.Player.playlist(fullPlaylist);
-                                        console.log('Передан плейлист из', fullPlaylist.length, 'серий');
-                                    }
-                                }).catch(function(error) {
-                                    console.error('Ошибка загрузки плейлиста:', error);
-                                    // Fallback - запускаем только текущую серию
-                                    Lampa.Player.play(first);
-                                });
-                            }
+                                if (playlist.length > 1)
+                                    first.playlist = playlist;
+                                Lampa.Player.play(first);
+                                Lampa.Player.playlist(playlist);
+                            });
                         } else {
-                            // Для фильмов
-                            Lampa.Player.play(first);
                             Lampa.Player.playlist([first]);
                         }
+
                         if (viewed.indexOf(hash_file) == -1) {
                             viewed.push(hash_file);
                             item.append('<div class="torrent-item__viewed">' + Lampa.Template.get('icon_star', {}, true) + '</div>');
