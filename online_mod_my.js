@@ -2593,7 +2593,7 @@
                         };
                         Lampa.Player.play(first);
 
-                        var defaultPlayer = Lampa.Storage.get('player_default');
+                        var defaultPlayer = Lampa.Storage.get('player_select', 'builtin');
                         // 'native', 'mx', 'external' и т.д.
 
                         if (element.season && Lampa.Platform.version) {
@@ -2603,7 +2603,7 @@
                                     playlist.push(first);
                                 } else {
 
-                                    if (defaultPlayer == '' || defaultPlayer == 'native') {
+                                    if (defaultPlayer == 'builtin') {
                                         var cell = {
                                             url: function url(call) {
                                                 getStream(elem, function(elem) {
