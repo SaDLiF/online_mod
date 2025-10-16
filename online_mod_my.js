@@ -2597,57 +2597,67 @@
                         // 'native', 'mx', 'external' и т.д.
 
                         if (element.season) {
-                            // Сначала загружаем ВСЕ данные для внешнего плеера
-                            var promises = [];
-                            
+                            var playlist = [];
                             items.forEach(function(elem) {
-                                if (elem !== element && !elem.stream) {
-                                    // Загружаем только те, у которых нет данных
-                                    var promise = new Promise(function(resolve) {
-                                        getStream(elem, function() {
-                                            resolve(); // Данные теперь в elem.stream
-                                        }, function() {
-                                            resolve(); // Все равно разрешаем
+                                if (elem == element) {
+                                    playlist.push(first);
+                                } else {
+                                    
+                                    if (defaultPlayer == 'builtin') {
+
+                                        var cell = {
+                                            url: function url(call) {
+                                                getStream(elem, function(elem) {
+                                                    cell.url = component.getDefaultQuality(elem.qualitys, elem.stream);
+                                                    cell.quality = component.renameQualityMap(elem.qualitys);
+                                                    cell.subtitles = elem.subtitles;
+                                                    call();
+                                                }, function() {
+                                                    cell.url = '';
+                                                    call();
+                                                });
+                                            },
+                                            timeline: elem.timeline,
+                                            title: elem.title
+                                        };
+
+                                        playlist.push(cell);
+                                    } else {
+
+                                        var ex = getStream(elem); // Синхронно получаем данные
+                                        playlist.push({
+                                            url: component.getDefaultQuality(ex.quality, ex.file),
+                                            quality: component.renameQualityMap(ex.quality),
+                                            timeline: elem.timeline,
+                                            title: elem.title
                                         });
-                                    });
-                                    promises.push(promise);
+
+                                        var cell = {
+                                            timeline: elem.timeline,
+                                            title: elem.title,
+                                            url: '',
+                                            // сюда положим ссылку
+                                            quality: null,
+                                            subtitles: null
+                                        };
+
+                                        // сразу получаем ссылку на поток
+                                        getStream(elem, function(res) {
+                                            cell.url = component.getDefaultQuality(res.qualitys, res.stream);
+                                            cell.quality = component.renameQualityMap(res.qualitys);
+                                            cell.subtitles = res.subtitles;
+                                        }, function() {
+                                            cell.url = '';
+                                        });
+                                        playlist.push(cell);
+
+                                    }
                                 }
                             });
-                            
-                            // Ждем загрузки всех данных
-                            Promise.all(promises).then(function() {
-                                // Теперь все elem.stream должны быть заполнены
-                                var playlist = [];
-                                
-                                items.forEach(function(elem) {
-                                    if (elem == element) {
-                                        playlist.push(first);
-                                    } else {
-                                        if (elem.stream && elem.qualitys) {
-                                            playlist.push({
-                                                url: component.getDefaultQuality(elem.qualitys, elem.stream),
-                                                quality: component.renameQualityMap(elem.qualitys),
-                                                subtitles: elem.subtitles,
-                                                timeline: elem.timeline,
-                                                title: elem.title
-                                            });
-                                        } else {
-                                            playlist.push({
-                                                url: '',
-                                                timeline: elem.timeline,
-                                                title: elem.title,
-                                                quality: null,
-                                                subtitles: null
-                                            });
-                                        }
-                                    }
-                                });
-                                
-                                if (playlist.length > 1)
-                                    first.playlist = playlist;
-                                Lampa.Player.play(first);
-                                Lampa.Player.playlist(playlist);
-                            });
+                            if (playlist.length > 1)
+                                first.playlist = playlist;
+                            Lampa.Player.play(first);
+                            Lampa.Player.playlist(playlist);
                         } else {
                             Lampa.Player.playlist([first]);
                         }
