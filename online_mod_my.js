@@ -2729,7 +2729,54 @@ function buildPlaylist(items, currentElement, select_title, getStreamFunction) {
     var viewed = Lampa.Storage.cache('online_view', 5000, []);
     var last_episode = component.getLastEpisode(items);
     
-    items.forEach(function (element) {
+    // Функция для получения всех ссылок плейлиста
+    function getAllStreams(callback) {
+        var completed = 0;
+        var total = items.length;
+        var playlist = [];
+        
+        items.forEach(function(element, index) {
+            if (element.stream) {
+                // Если поток уже загружен
+                playlist[index] = {
+                    url: component.getDefaultQuality(element.qualitys, element.stream),
+                    quality: component.renameQualityMap(element.qualitys),
+                    subtitles: element.subtitles,
+                    timeline: element.timeline,
+                    title: element.season ? element.title : select_title + (element.title == select_title ? '' : ' / ' + element.title)
+                };
+                completed++;
+            } else {
+                // Загружаем поток
+                element.loading = true;
+                getStream(element, function(elem) {
+                    element.loading = false;
+                    playlist[index] = {
+                        url: component.getDefaultQuality(elem.qualitys, elem.stream),
+                        quality: component.renameQualityMap(elem.qualitys),
+                        subtitles: elem.subtitles,
+                        timeline: elem.timeline,
+                        title: elem.season ? elem.title : select_title + (elem.title == select_title ? '' : ' / ' + elem.title)
+                    };
+                    completed++;
+                    if (completed === total) callback(playlist.filter(Boolean)); // Убираем null элементы
+                }, function() {
+                    element.loading = false;
+                    playlist[index] = null; // Помечаем как неудачный
+                    completed++;
+                    if (completed === total) callback(playlist.filter(Boolean)); // Убираем null элементы
+                    Lampa.Noty.show('Не удалось загрузить некоторые серии');
+                });
+            }
+        });
+        
+        // Если все потоки уже загружены
+        if (completed === total) {
+            callback(playlist.filter(Boolean));
+        }
+    }
+
+    items.forEach(function (element, index) {
         if (element.season) {
             element.translate_episode_end = last_episode;
             element.translate_voice = filter_items.voice[choice.voice];
@@ -2751,73 +2798,28 @@ function buildPlaylist(items, currentElement, select_title, getStreamFunction) {
         item.on('hover:enter', function () {
             if (element.loading) return;
             if (object.movie.id) Lampa.Favorite.add('history', object.movie, 100);
-            element.loading = true;
             
-            getStream(element, function (element) {
-                element.loading = false;
-                
-                // Создаем полный плейлист для всех элементов
-                var fullPlaylist = [];
-                var currentElementData = {
-                    url: component.getDefaultQuality(element.qualitys, element.stream),
-                    quality: component.renameQualityMap(element.qualitys),
-                    subtitles: element.subtitles,
-                    timeline: element.timeline,
-                    title: element.season ? element.title : select_title + (element.title == select_title ? '' : ' / ' + element.title)
-                };
-
-                // Добавляем текущий элемент
-                fullPlaylist.push(currentElementData);
-
-                // Если это сериал, добавляем остальные серии в плейлист
-                if (element.season) {
-                    items.forEach(function (elem) {
-                        if (elem !== element) {
-                            // Для остальных элементов создаем объекты с функцией получения URL
-                            var playlistItem = {
-                                url: function(call) {
-                                    if (elem.stream) {
-                                        // Если поток уже загружен
-                                        call();
-                                    } else {
-                                        // Если поток еще не загружен
-                                        elem.loading = true;
-                                        getStream(elem, function(elem) {
-                                            elem.loading = false;
-                                            playlistItem.url = component.getDefaultQuality(elem.qualitys, elem.stream);
-                                            playlistItem.quality = component.renameQualityMap(elem.qualitys);
-                                            playlistItem.subtitles = elem.subtitles;
-                                            call();
-                                        }, function() {
-                                            playlistItem.url = '';
-                                            call();
-                                        });
-                                    }
-                                },
-                                quality: elem.qualitys ? component.renameQualityMap(elem.qualitys) : {},
-                                subtitles: elem.subtitles,
-                                timeline: elem.timeline,
-                                title: elem.title
-                            };
-                            fullPlaylist.push(playlistItem);
-                        }
-                    });
+            // Получаем все ссылки перед воспроизведением
+            getAllStreams(function(fullPlaylist) {
+                if (fullPlaylist.length === 0) {
+                    Lampa.Noty.show('Не удалось загрузить плейлист');
+                    return;
                 }
 
-                // Создаем первый элемент с прикрепленным плейлистом
-                var first = {
-                    url: currentElementData.url,
-                    quality: currentElementData.quality,
-                    subtitles: currentElementData.subtitles,
-                    timeline: currentElementData.timeline,
-                    title: currentElementData.title,
-                    playlist: fullPlaylist // Передаем весь плейлист
-                };
+                // Находим текущий элемент в плейлисте
+                var currentIndex = fullPlaylist.findIndex(function(item) {
+                    return item.title === (element.season ? element.title : select_title + (element.title == select_title ? '' : ' / ' + element.title));
+                });
+
+                if (currentIndex === -1) currentIndex = 0;
+
+                var first = fullPlaylist[currentIndex];
+                first.playlist = fullPlaylist; // Передаем полный плейлист
 
                 // Запускаем воспроизведение
                 Lampa.Player.play(first);
                 
-                // Устанавливаем плейлист для поддержки внешних плееров
+                // Дополнительно устанавливаем плейлист
                 if (Lampa.Player.playlist) {
                     Lampa.Player.playlist(fullPlaylist);
                 }
@@ -2827,9 +2829,6 @@ function buildPlaylist(items, currentElement, select_title, getStreamFunction) {
                     item.append('<div class="torrent-item__viewed">' + Lampa.Template.get('icon_star', {}, true) + '</div>');
                     Lampa.Storage.set('online_view', viewed);
                 }
-            }, function (error) {
-                element.loading = false;
-                Lampa.Noty.show(error || Lampa.Lang.translate(extract.blocked ? 'online_mod_blockedlink' : 'online_mod_nolink'));
             });
         });
         
@@ -2853,7 +2852,7 @@ function buildPlaylist(items, currentElement, select_title, getStreamFunction) {
         });
     });
     component.start(true);
-}
+    }
 
     function kinobase(component, _object) {
       var network = new Lampa.Reguest();
