@@ -2554,126 +2554,182 @@
        */
 
         function append(items) {
-            component.reset();
-            var viewed = Lampa.Storage.cache('online_view', 5000, []);
-            var last_episode = component.getLastEpisode(items);
-            
-            // ПРЕДЗАГРУЗКА всех данных ДО того как пользователь нажмет
-            var preloadPromises = items.map(function(element) {
-                return new Promise(function(resolve) {
-                    if (element.stream) {
-                        resolve(); // Уже загружено
-                        return;
-                    }
-                    getStream(element, function() {
-                        resolve(); // Загрузили
-                    }, function() {
-                        resolve(); // Ошибка, но все равно разрешаем
-                    });
-                });
-            });
-            
-            // Ждем завершения предзагрузки
-            Promise.all(preloadPromises).then(function() {
-                console.log('Все данные предзагружены');
+        component.reset();
+        
+        const viewed = Lampa.Storage.cache('online_view', 5000, []);
+        const last_episode = component.getLastEpisode(items);
+        
+        // Предзагружаем все данные
+        preloadAllStreams(items).then(() => {
+            initializeInterface(items, viewed, last_episode);
+            component.start(true);
+        });
+    }
+
+    // Функция предзагрузки всех потоков
+    function preloadAllStreams(items) {
+        const loadPromises = items.map(element => {
+            return new Promise(resolve => {
+                // Если данные уже есть - сразу разрешаем
+                if (element.stream && element.qualitys) {
+                    resolve();
+                    return;
+                }
                 
-                items.forEach(function(element) {
-                    if (element.season) {
-                        element.translate_episode_end = last_episode;
-                        element.translate_voice = filter_items.voice[choice.voice];
-                    }
-
-                    var hash = Lampa.Utils.hash(element.season ? [element.season, element.season > 10 ? ':' : '', element.episode, object.movie.original_title].join('') : object.movie.original_title);
-                    var view = Lampa.Timeline.view(hash);
-                    var item = Lampa.Template.get('online_mod', element);
-                    var hash_file = Lampa.Utils.hash(element.season ? [element.season, element.season > 10 ? ':' : '', element.episode, object.movie.original_title, filter_items.voice[choice.voice]].join('') : object.movie.original_title + element.title);
-                    element.timeline = view;
-                    item.append(Lampa.Timeline.render(view));
-
-                    if (Lampa.Timeline.details) {
-                        item.find('.online__quality').append(Lampa.Timeline.details(view, ' / '));
-                    }
-
-                    if (viewed.indexOf(hash_file) !== -1)
-                        item.append('<div class="torrent-item__viewed">' + Lampa.Template.get('icon_star', {}, true) + '</div>');
-                    
-                    item.on('hover:enter', function() {
-                        if (element.loading) return;
-                        if (object.movie.id)
-                            Lampa.Favorite.add('history', object.movie, 100);
-                        
-                        element.loading = true;
-                        
-                        // Данные УЖЕ загружены - используем синхронно
-                        var first = {
-                            url: component.getDefaultQuality(element.qualitys, element.stream),
-                            quality: component.renameQualityMap(element.qualitys),
-                            subtitles: element.subtitles,
-                            timeline: element.timeline,
-                            title: element.season ? element.title : select_title + (element.title == select_title ? '' : ' / ' + element.title)
-                        };
-
-                        var defaultPlayer = Lampa.Storage.get('player_select', 'builtin');
-
-                        if (element.season) {
-                            // Создаем плейлист из ПРЕДЗАГРУЖЕННЫХ данных
-                            var playlist = items.map(function(elem) {
-                                return {
-                                    url: component.getDefaultQuality(elem.qualitys, elem.stream),
-                                    quality: component.renameQualityMap(elem.qualitys),
-                                    subtitles: elem.subtitles,
-                                    timeline: elem.timeline,
-                                    title: elem.title
-                                };
-                            });
-                            
-                            // Находим индекс текущей серии
-                            var currentIndex = items.indexOf(element);
-                            
-                            if (defaultPlayer === 'builtin') {
-                                // Встроенный плеер
-                                Lampa.Player.play(playlist[currentIndex]);
-                                Lampa.Player.playlist(playlist);
-                            } else {
-                                // Внешний плеер
-                                Lampa.Player.play(playlist[currentIndex]);
-                                Lampa.Player.playlist(playlist);
-                                console.log('Передан плейлист из', playlist.length, 'серий');
-                            }
-                        } else {
-                            // Для фильмов
-                            Lampa.Player.play(first);
-                            Lampa.Player.playlist([first]);
-                        }
-
-                        if (viewed.indexOf(hash_file) == -1) {
-                            viewed.push(hash_file);
-                            item.append('<div class="torrent-item__viewed">' + Lampa.Template.get('icon_star', {}, true) + '</div>');
-                            Lampa.Storage.set('online_view', viewed);
-                        }
-                        
-                        element.loading = false;
-                    });
-                    
-                    component.append(item);
-                    component.contextmenu({
-                        item: item,
-                        view: view,
-                        viewed: viewed,
-                        hash_file: hash_file,
-                        element: element,
-                        file: function file(call) {
-                            call({
-                                file: element.stream,
-                                quality: element.qualitys
-                            });
-                        }
-                    });
-                });
-                
-                component.start(true);
+                getStream(element, 
+                    () => resolve(), // Успех
+                    () => resolve()  // Ошибка (все равно разрешаем)
+                );
             });
+        });
+        
+        return Promise.all(loadPromises);
+    }
+
+    // Инициализация интерфейса
+    function initializeInterface(items, viewed, last_episode) {
+        items.forEach(element => {
+            prepareElementData(element, last_episode);
+            const item = createListItem(element, viewed);
+            setupItemInteractions(item, element, items, viewed);
+            component.append(item);
+        });
+    }
+
+    // Подготовка данных элемента
+    function prepareElementData(element, last_episode) {
+        if (element.season) {
+            element.translate_episode_end = last_episode;
+            element.translate_voice = filter_items.voice[choice.voice];
         }
+        
+        const hash = Lampa.Utils.hash(
+            element.season 
+                ? [element.season, element.season > 10 ? ':' : '', element.episode, object.movie.original_title].join('')
+                : object.movie.original_title
+        );
+        
+        element.timeline = Lampa.Timeline.view(hash);
+    }
+
+    // Создание элемента списка
+    function createListItem(element, viewed) {
+        const item = Lampa.Template.get('online_mod', element);
+        const hash_file = generateHashFile(element);
+        
+        // Добавляем timeline
+        item.append(Lampa.Timeline.render(element.timeline));
+        
+        // Добавляем детали качества
+        if (Lampa.Timeline.details) {
+            item.find('.online__quality').append(Lampa.Timeline.details(element.timeline, ' / '));
+        }
+        
+        // Отмечаем просмотренные
+        if (viewed.indexOf(hash_file) !== -1) {
+            item.append(createViewedBadge());
+        }
+        
+        return item;
+    }
+
+    // Генерация хеша для файла
+    function generateHashFile(element) {
+        return Lampa.Utils.hash(
+            element.season
+                ? [element.season, element.season > 10 ? ':' : '', element.episode, object.movie.original_title, filter_items.voice[choice.voice]].join('')
+                : object.movie.original_title + element.title
+        );
+    }
+
+    // Создание бейджа "Просмотрено"
+    function createViewedBadge() {
+        return '<div class="torrent-item__viewed">' + Lampa.Template.get('icon_star', {}, true) + '</div>';
+    }
+
+    // Настройка взаимодействий с элементом
+    function setupItemInteractions(item, element, allItems, viewed) {
+        const hash_file = generateHashFile(element);
+        
+        // Обработчик клика
+        item.on('hover:enter', () => handleItemClick(element, allItems, viewed, hash_file, item));
+        
+        // Контекстное меню
+        component.contextmenu({
+            item: item,
+            view: element.timeline,
+            viewed: viewed,
+            hash_file: hash_file,
+            element: element,
+            file: (call) => handleContextMenu(element, call)
+        });
+    }
+
+    // Обработчик клика на элемент
+    function handleItemClick(element, allItems, viewed, hash_file, item) {
+        if (object.movie.id) {
+            Lampa.Favorite.add('history', object.movie, 100);
+        }
+        
+        const first = createPlaylistItem(element, true);
+        
+        if (element.season) {
+            const playlist = createFullPlaylist(allItems, element);
+            playWithPlaylist(first, playlist);
+        } else {
+            playSingleItem(first);
+        }
+        
+        markAsViewed(viewed, hash_file, item);
+    }
+
+    // Создание элемента плейлиста
+    function createPlaylistItem(element, isFirst = false) {
+        return {
+            url: component.getDefaultQuality(element.qualitys, element.stream),
+            quality: component.renameQualityMap(element.qualitys),
+            subtitles: element.subtitles,
+            timeline: element.timeline,
+            title: isFirst 
+                ? (element.season ? element.title : select_title + (element.title == select_title ? '' : ' / ' + element.title))
+                : element.title
+        };
+    }
+
+    // Создание полного плейлиста
+    function createFullPlaylist(allItems, currentElement) {
+        return allItems.map(element => createPlaylistItem(element, element === currentElement));
+    }
+
+    // Воспроизведение с плейлистом
+    function playWithPlaylist(firstItem, playlist) {
+        Lampa.Player.play(firstItem);
+        Lampa.Player.playlist(playlist);
+        console.log('🎬 Передан плейлист из', playlist.length, 'серий');
+    }
+
+    // Воспроизведение одиночного элемента
+    function playSingleItem(item) {
+        Lampa.Player.play(item);
+        Lampa.Player.playlist([item]);
+    }
+
+    // Отметка как просмотренного
+    function markAsViewed(viewed, hash_file, item) {
+        if (viewed.indexOf(hash_file) === -1) {
+            viewed.push(hash_file);
+            item.append(createViewedBadge());
+            Lampa.Storage.set('online_view', viewed);
+        }
+    }
+
+    // Обработчик контекстного меню
+    function handleContextMenu(element, call) {
+        call({
+            file: element.stream,
+            quality: element.qualitys
+        });
+    }
     }
 
     function kinobase(component, _object) {
