@@ -2553,10 +2553,49 @@
        * Показать файлы
        */
 
+        // 1. Добавь эту функцию
+        function getStreamSync(elem) {
+            if (elem.stream && elem.qualitys) {
+                return {
+                    quality: elem.qualitys,
+                    file: elem.stream,
+                    subtitles: elem.subtitles
+                };
+            }
+            return {
+                quality: [],
+                file: '',
+                subtitles: []
+            };
+        }
+
         function append(items) {
             component.reset();
             var viewed = Lampa.Storage.cache('online_view', 5000, []);
             var last_episode = component.getLastEpisode(items);
+
+            // В начале функции append ДО items.forEach
+            function preloadAllStreams(items) {
+                var promises = items.map(function(elem) {
+                    return new Promise(function(resolve) {
+                        if (elem.stream) {
+                            resolve(); // Уже загружено
+                            return;
+                        }
+                        getStream(elem, function() {
+                            resolve(); // Загрузили
+                        }, function() {
+                            resolve(); // Ошибка, но все равно разрешаем
+                        });
+                    });
+                });
+                return Promise.all(promises);
+            }
+
+            preloadAllStreams(items).then(function() {
+                // Теперь все данные готовы
+            });
+
             items.forEach(function(element) {
                 if (element.season) {
                     element.translate_episode_end = last_episode;
@@ -2603,7 +2642,7 @@
                                     playlist.push(first);
                                 } else {
                                     
-                                    var ex = getStream(elem); // Синхронно получаем данные
+                                    var ex = getStreamSync(elem); // Синхронно получаем данные
                                         playlist.push({
                                             url: component.getDefaultQuality(ex.quality, ex.file),
                                             quality: component.renameQualityMap(ex.quality),
