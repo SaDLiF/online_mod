@@ -2604,23 +2604,23 @@
                                 } else {
                                     
                                     if (defaultPlayer == 'builtin') {
-                                        var cell = {
-                                            timeline: elem.timeline,
-                                            title: elem.title,
-                                            url: '',
-                                            // сюда положим ссылку
-                                            quality: null,
-                                            subtitles: null
-                                        };
+                                        // var cell = {
+                                        //     timeline: elem.timeline,
+                                        //     title: elem.title,
+                                        //     url: '',
+                                        //     // сюда положим ссылку
+                                        //     quality: null,
+                                        //     subtitles: null
+                                        // };
 
-                                        // сразу получаем ссылку на поток
-                                        getStream(elem, function(res) {
-                                            cell.url = component.getDefaultQuality(res.qualitys, res.stream);
-                                            cell.quality = component.renameQualityMap(res.qualitys);
-                                            cell.subtitles = res.subtitles;
-                                        }, function() {
-                                            cell.url = '';
-                                        });
+                                        // // сразу получаем ссылку на поток
+                                        // getStream(elem, function(res) {
+                                        //     cell.url = component.getDefaultQuality(res.qualitys, res.stream);
+                                        //     cell.quality = component.renameQualityMap(res.qualitys);
+                                        //     cell.subtitles = res.subtitles;
+                                        // }, function() {
+                                        //     cell.url = '';
+                                        // });
                                         
                                         // var cell = {
                                         //     url: function url(call) {
