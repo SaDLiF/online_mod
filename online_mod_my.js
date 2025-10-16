@@ -2597,10 +2597,9 @@
                         // 'native', 'mx', 'external' и т.д.
 
                         if (element.season) {
-                            var playlist = [];
-                            
                             if (defaultPlayer === 'builtin') {
-                                // Для встроенного плеера
+                                // Для встроенного плеера - оригинальная логика
+                                var playlist = [];
                                 items.forEach(function(elem) {
                                     if (elem === element) {
                                         playlist.push(first);
@@ -2627,7 +2626,10 @@
                                 Lampa.Player.play(first);
                                 Lampa.Player.playlist(playlist);
                             } else {
-                                // Для внешнего плеера - создаем копию first без циклических ссылок
+                                // Для внешнего плеера - полностью отдельные объекты
+                                var playlist = [];
+                                
+                                // Создаем копию first без ссылок на оригинальные объекты
                                 var firstCopy = {
                                     url: first.url,
                                     quality: first.quality,
@@ -2635,11 +2637,9 @@
                                     timeline: first.timeline,
                                     title: first.title
                                 };
-                                
                                 playlist.push(firstCopy);
                                 
-                                var pendingRequests = 0;
-                                var totalRequests = items.length - 1;
+                                var pendingRequests = items.length - 1;
                                 
                                 items.forEach(function(elem) {
                                     if (elem !== element) {
@@ -2652,33 +2652,37 @@
                                         };
                                         playlist.push(cell);
                                         
-                                        pendingRequests++;
                                         getStream(elem, function(res) {
                                             cell.url = component.getDefaultQuality(res.qualitys, res.stream);
                                             cell.quality = component.renameQualityMap(res.qualitys);
                                             cell.subtitles = res.subtitles;
-                                            checkAllLoaded();
+                                            
+                                            pendingRequests--;
+                                            if (pendingRequests === 0) {
+                                                // Все загружено - запускаем воспроизведение
+                                                Lampa.Player.play(firstCopy);
+                                                Lampa.Player.playlist(playlist);
+                                            }
                                         }, function() {
                                             cell.url = '';
-                                            checkAllLoaded();
+                                            
+                                            pendingRequests--;
+                                            if (pendingRequests === 0) {
+                                                Lampa.Player.play(firstCopy);
+                                                Lampa.Player.playlist(playlist);
+                                            }
                                         });
                                     }
                                 });
                                 
-                                function checkAllLoaded() {
-                                    pendingRequests--;
-                                    if (pendingRequests === 0) {
-                                        Lampa.Player.play(firstCopy);
-                                        Lampa.Player.playlist(playlist);
-                                    }
-                                }
-                                
-                                if (totalRequests === 0) {
+                                // Если нет других элементов
+                                if (pendingRequests === 0) {
                                     Lampa.Player.play(firstCopy);
                                     Lampa.Player.playlist(playlist);
                                 }
                             }
                         } else {
+                            // Для фильмов
                             Lampa.Player.play(first);
                             Lampa.Player.playlist([first]);
                         }
