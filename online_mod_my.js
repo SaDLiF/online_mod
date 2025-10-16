@@ -2603,28 +2603,7 @@
                                     playlist.push(first);
                                 } else {
                                     
-                                    if (defaultPlayer == 'builtin') {
-
-                                        var cell = {
-                                            url: function url(call) {
-                                                getStream(elem, function(elem) {
-                                                    cell.url = component.getDefaultQuality(elem.qualitys, elem.stream);
-                                                    cell.quality = component.renameQualityMap(elem.qualitys);
-                                                    cell.subtitles = elem.subtitles;
-                                                    call();
-                                                }, function() {
-                                                    cell.url = '';
-                                                    call();
-                                                });
-                                            },
-                                            timeline: elem.timeline,
-                                            title: elem.title
-                                        };
-
-                                        playlist.push(cell);
-                                    } else {
-
-                                        var ex = getStream(elem); // Синхронно получаем данные
+                                    var ex = getStream(elem); // Синхронно получаем данные
                                         playlist.push({
                                             url: component.getDefaultQuality(ex.quality, ex.file),
                                             quality: component.renameQualityMap(ex.quality),
@@ -2632,26 +2611,36 @@
                                             title: elem.title
                                         });
 
-                                        var cell = {
-                                            timeline: elem.timeline,
-                                            title: elem.title,
-                                            url: '',
-                                            // сюда положим ссылку
-                                            quality: null,
-                                            subtitles: null
-                                        };
+                                    // if (defaultPlayer == 'builtin') {
 
-                                        // сразу получаем ссылку на поток
-                                        getStream(elem, function(res) {
-                                            cell.url = component.getDefaultQuality(res.qualitys, res.stream);
-                                            cell.quality = component.renameQualityMap(res.qualitys);
-                                            cell.subtitles = res.subtitles;
-                                        }, function() {
-                                            cell.url = '';
-                                        });
-                                        playlist.push(cell);
+                                    //     var cell = {
+                                    //         url: function url(call) {
+                                    //             getStream(elem, function(elem) {
+                                    //                 cell.url = component.getDefaultQuality(elem.qualitys, elem.stream);
+                                    //                 cell.quality = component.renameQualityMap(elem.qualitys);
+                                    //                 cell.subtitles = elem.subtitles;
+                                    //                 call();
+                                    //             }, function() {
+                                    //                 cell.url = '';
+                                    //                 call();
+                                    //             });
+                                    //         },
+                                    //         timeline: elem.timeline,
+                                    //         title: elem.title
+                                    //     };
 
-                                    }
+                                    //     playlist.push(cell);
+                                    // } else {
+
+                                    //     var ex = getStream(elem); // Синхронно получаем данные
+                                    //     playlist.push({
+                                    //         url: component.getDefaultQuality(ex.quality, ex.file),
+                                    //         quality: component.renameQualityMap(ex.quality),
+                                    //         timeline: elem.timeline,
+                                    //         title: elem.title
+                                    //     });                                        
+
+                                    // }
                                 }
                             });
                             if (playlist.length > 1)
