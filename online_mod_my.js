@@ -2604,7 +2604,7 @@
                                 } else {
                                     
                                     if (defaultPlayer == 'builtin') {
-                                                                             
+
                                         var cell = {
                                             url: function url(call) {
                                                 getStream(elem, function(elem) {
