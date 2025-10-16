@@ -2596,7 +2596,7 @@
                         var defaultPlayer = Lampa.Storage.get('player_select', 'builtin');
                         // 'native', 'mx', 'external' и т.д.
 
-                        if (element.season && Lampa.Platform.version) {
+                        if (element.season) {
                             var playlist = [];
                             items.forEach(function(elem) {
                                 if (elem == element) {
@@ -2604,39 +2604,22 @@
                                 } else {
                                     
                                     if (defaultPlayer == 'builtin') {
-                                        // var cell = {
-                                        //     timeline: elem.timeline,
-                                        //     title: elem.title,
-                                        //     url: '',
-                                        //     // сюда положим ссылку
-                                        //     quality: null,
-                                        //     subtitles: null
-                                        // };
-
-                                        // // сразу получаем ссылку на поток
-                                        // getStream(elem, function(res) {
-                                        //     cell.url = component.getDefaultQuality(res.qualitys, res.stream);
-                                        //     cell.quality = component.renameQualityMap(res.qualitys);
-                                        //     cell.subtitles = res.subtitles;
-                                        // }, function() {
-                                        //     cell.url = '';
-                                        // });
-                                        
-                                        // var cell = {
-                                        //     url: function url(call) {
-                                        //         getStream(elem, function(elem) {
-                                        //             cell.url = component.getDefaultQuality(elem.qualitys, elem.stream);
-                                        //             cell.quality = component.renameQualityMap(elem.qualitys);
-                                        //             cell.subtitles = elem.subtitles;
-                                        //             call();
-                                        //         }, function() {
-                                        //             cell.url = '';
-                                        //             call();
-                                        //         });
-                                        //     },
-                                        //     timeline: elem.timeline,
-                                        //     title: elem.title
-                                        // };
+                                                                             
+                                        var cell = {
+                                            url: function url(call) {
+                                                getStream(elem, function(elem) {
+                                                    cell.url = component.getDefaultQuality(elem.qualitys, elem.stream);
+                                                    cell.quality = component.renameQualityMap(elem.qualitys);
+                                                    cell.subtitles = elem.subtitles;
+                                                    call();
+                                                }, function() {
+                                                    cell.url = '';
+                                                    call();
+                                                });
+                                            },
+                                            timeline: elem.timeline,
+                                            title: elem.title
+                                        };
 
                                         playlist.push(cell);
                                     } else {
