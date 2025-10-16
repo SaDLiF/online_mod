@@ -2729,54 +2729,34 @@ function buildPlaylist(items, currentElement, select_title, getStreamFunction) {
     var viewed = Lampa.Storage.cache('online_view', 5000, []);
     var last_episode = component.getLastEpisode(items);
     
-    // Функция для получения всех ссылок плейлиста
-    function getAllStreams(callback) {
-        var completed = 0;
-        var total = items.length;
+    // Функция для получения всех файлов (аналогично getFile в Filmix)
+    function getAllFiles() {
         var playlist = [];
-        
-        items.forEach(function(element, index) {
-            if (element.stream) {
+        items.forEach(function(elem) {
+            if (elem.stream) {
                 // Если поток уже загружен
-                playlist[index] = {
-                    url: component.getDefaultQuality(element.qualitys, element.stream),
-                    quality: component.renameQualityMap(element.qualitys),
-                    subtitles: element.subtitles,
-                    timeline: element.timeline,
-                    title: element.season ? element.title : select_title + (element.title == select_title ? '' : ' / ' + element.title)
-                };
-                completed++;
+                playlist.push({
+                    url: component.getDefaultQuality(elem.qualitys, elem.stream),
+                    quality: component.renameQualityMap(elem.qualitys),
+                    subtitles: elem.subtitles,
+                    timeline: elem.timeline,
+                    title: elem.season ? elem.title : select_title + (elem.title == select_title ? '' : ' / ' + elem.title)
+                });
             } else {
-                // Загружаем поток
-                element.loading = true;
-                getStream(element, function(elem) {
-                    element.loading = false;
-                    playlist[index] = {
-                        url: component.getDefaultQuality(elem.qualitys, elem.stream),
-                        quality: component.renameQualityMap(elem.qualitys),
-                        subtitles: elem.subtitles,
-                        timeline: elem.timeline,
-                        title: elem.season ? elem.title : select_title + (elem.title == select_title ? '' : ' / ' + elem.title)
-                    };
-                    completed++;
-                    if (completed === total) callback(playlist.filter(Boolean)); // Убираем null элементы
-                }, function() {
-                    element.loading = false;
-                    playlist[index] = null; // Помечаем как неудачный
-                    completed++;
-                    if (completed === total) callback(playlist.filter(Boolean)); // Убираем null элементы
-                    Lampa.Noty.show('Не удалось загрузить некоторые серии');
+                // Для незагруженных создаем заглушку
+                playlist.push({
+                    url: '', // Будет загружено позже
+                    quality: {},
+                    subtitles: elem.subtitles,
+                    timeline: elem.timeline,
+                    title: elem.season ? elem.title : select_title + (elem.title == select_title ? '' : ' / ' + elem.title)
                 });
             }
         });
-        
-        // Если все потоки уже загружены
-        if (completed === total) {
-            callback(playlist.filter(Boolean));
-        }
+        return playlist;
     }
 
-    items.forEach(function (element, index) {
+    items.forEach(function (element) {
         if (element.season) {
             element.translate_episode_end = last_episode;
             element.translate_voice = filter_items.voice[choice.voice];
@@ -2798,37 +2778,82 @@ function buildPlaylist(items, currentElement, select_title, getStreamFunction) {
         item.on('hover:enter', function () {
             if (element.loading) return;
             if (object.movie.id) Lampa.Favorite.add('history', object.movie, 100);
+            element.loading = true;
             
-            // Получаем все ссылки перед воспроизведением
-            getAllStreams(function(fullPlaylist) {
-                if (fullPlaylist.length === 0) {
-                    Lampa.Noty.show('Не удалось загрузить плейлист');
-                    return;
-                }
-
-                // Находим текущий элемент в плейлисте
-                var currentIndex = fullPlaylist.findIndex(function(item) {
-                    return item.title === (element.season ? element.title : select_title + (element.title == select_title ? '' : ' / ' + element.title));
-                });
-
-                if (currentIndex === -1) currentIndex = 0;
-
-                var first = fullPlaylist[currentIndex];
-                first.playlist = fullPlaylist; // Передаем полный плейлист
-
-                // Запускаем воспроизведение
-                Lampa.Player.play(first);
+            getStream(element, function (element) {
+                element.loading = false;
                 
-                // Дополнительно устанавливаем плейлист
-                if (Lampa.Player.playlist) {
-                    Lampa.Player.playlist(fullPlaylist);
+                // Создаем плейлист (как в Filmix)
+                var playlist = [];
+                var first = {
+                    url: component.getDefaultQuality(element.qualitys, element.stream),
+                    quality: component.renameQualityMap(element.qualitys),
+                    subtitles: element.subtitles,
+                    timeline: element.timeline,
+                    title: element.season ? element.title : select_title + (element.title == select_title ? '' : ' / ' + element.title)
+                };
+
+                if (element.season) {
+                    // Добавляем текущий элемент
+                    playlist.push(first);
+                    
+                    // Добавляем остальные элементы
+                    items.forEach(function (elem) {
+                        if (elem !== element) {
+                            if (elem.stream) {
+                                // Если поток уже загружен
+                                playlist.push({
+                                    url: component.getDefaultQuality(elem.qualitys, elem.stream),
+                                    quality: component.renameQualityMap(elem.qualitys),
+                                    subtitles: elem.subtitles,
+                                    timeline: elem.timeline,
+                                    title: elem.title
+                                });
+                            } else {
+                                // Создаем элемент с функцией загрузки
+                                var playlistItem = {
+                                    url: function(call) {
+                                        elem.loading = true;
+                                        getStream(elem, function(elem) {
+                                            elem.loading = false;
+                                            playlistItem.url = component.getDefaultQuality(elem.qualitys, elem.stream);
+                                            playlistItem.quality = component.renameQualityMap(elem.qualitys);
+                                            playlistItem.subtitles = elem.subtitles;
+                                            call();
+                                        }, function() {
+                                            playlistItem.url = '';
+                                            call();
+                                        });
+                                    },
+                                    quality: {},
+                                    subtitles: elem.subtitles,
+                                    timeline: elem.timeline,
+                                    title: elem.title
+                                };
+                                playlist.push(playlistItem);
+                            }
+                        }
+                    });
+                } else {
+                    playlist.push(first);
                 }
+
+                // Передаем плейлист как в Filmix
+                if (playlist.length > 1) {
+                    first.playlist = playlist;
+                }
+                
+                Lampa.Player.play(first);
+                Lampa.Player.playlist(playlist);
 
                 if (viewed.indexOf(hash_file) == -1) {
                     viewed.push(hash_file);
                     item.append('<div class="torrent-item__viewed">' + Lampa.Template.get('icon_star', {}, true) + '</div>');
                     Lampa.Storage.set('online_view', viewed);
                 }
+            }, function (error) {
+                element.loading = false;
+                Lampa.Noty.show(error || Lampa.Lang.translate(extract.blocked ? 'online_mod_blockedlink' : 'online_mod_nolink'));
             });
         });
         
@@ -2852,7 +2877,7 @@ function buildPlaylist(items, currentElement, select_title, getStreamFunction) {
         });
     });
     component.start(true);
-    }
+}
 
     function kinobase(component, _object) {
       var network = new Lampa.Reguest();
