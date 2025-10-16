@@ -2599,94 +2599,90 @@
                         if (element.season) {
                             if (defaultPlayer == 'builtin2') {
                                 // Для встроенного плеера - оригинальная логика
-                                var playlist = [];
-                                items.forEach(function(elem) {
-                                    if (elem == element) {
-                                        playlist.push(first);
-                                    } else {
-                                        var cell = {
-                                            url: function(call) {
-                                                getStream(elem, function(elem) {
-                                                    cell.url = component.getDefaultQuality(elem.qualitys, elem.stream);
-                                                    cell.quality = component.renameQualityMap(elem.qualitys);
-                                                    cell.subtitles = elem.subtitles;
-                                                    call();
-                                                }, function() {
-                                                    cell.url = '';
-                                                    call();
-                                                });
-                                            },
+                        var playlist = [];
+                        items.forEach(function(elem) {
+                            if (elem == element) {
+                                playlist.push(first);
+                            } else {
+                                var cell = {
+                                    url: function(call) {
+                                        getStream(elem, function(elem) {
+                                            cell.url = component.getDefaultQuality(elem.qualitys, elem.stream);
+                                            cell.quality = component.renameQualityMap(elem.qualitys);
+                                            cell.subtitles = elem.subtitles;
+                                            call();
+                                        }, function() {
+                                            cell.url = '';
+                                            call();
+                                        });
+                                    },
+                                    timeline: elem.timeline,
+                                    title: elem.title
+                                };
+                                playlist.push(cell);
+                            }
+                        });
+                        Lampa.Player.play(first);
+                        Lampa.Player.playlist(playlist);
+                    } else {
+                        // Для внешнего плеера - загружаем ВСЕ серии перед передачей
+                        var promises = [];
+                        
+                        // Создаем промисы для всех серий
+                        items.forEach(function(elem) {
+                            var promise = new Promise(function(resolve) {
+                                if (elem === element) {
+                                    // Текущая серия - используем first объект
+                                    resolve(first); // ИСПРАВЛЕНО
+                                } else {
+                                    // Остальные серии - загружаем
+                                    getStream(elem, function(res) {
+                                        resolve({
+                                            url: component.getDefaultQuality(res.qualitys, res.stream),
+                                            quality: component.renameQualityMap(res.qualitys),
+                                            subtitles: res.subtitles,
                                             timeline: elem.timeline,
                                             title: elem.title
-                                        };
-                                        playlist.push(cell);
-                                    }
-                                });
-                                Lampa.Player.play(first);
-                                Lampa.Player.playlist(playlist);
-                            } else {
-                                // Для внешнего плеера - загружаем ВСЕ серии перед передачей
-                                var promises = [];
-                                var playlistItems = [];
-                                
-                                // Создаем промисы для всех серий
-                                items.forEach(function(elem, index) {
-                                    var promise = new Promise(function(resolve) {
-                                        if (elem === element) {
-                                            // Текущая серия - уже загружена
-                                            resolve({
-                                                url: elem.url,
-                                                quality: elem.quality,
-                                                subtitles: elem.subtitles,
-                                                timeline: elem.timeline,
-                                                title: elem.title
-                                            });
-                                        } else {
-                                            // Остальные серии - загружаем
-                                            getStream(elem, function(res) {
-                                                resolve({
-                                                    url: component.getDefaultQuality(res.qualitys, res.stream),
-                                                    quality: component.renameQualityMap(res.qualitys),
-                                                    subtitles: res.subtitles,
-                                                    timeline: elem.timeline,
-                                                    title: elem.title
-                                                });
-                                            }, function() {
-                                                resolve({
-                                                    url: '',
-                                                    timeline: elem.timeline,
-                                                    title: elem.title,
-                                                    quality: null,
-                                                    subtitles: null
-                                                });
-                                            });
-                                        }
+                                        });
+                                    }, function() {
+                                        resolve({
+                                            url: '',
+                                            timeline: elem.timeline,
+                                            title: elem.title,
+                                            quality: null,
+                                            subtitles: null
+                                        });
                                     });
-                                    promises.push(promise);
-                                });
+                                }
+                            });
+                            promises.push(promise);
+                        });
 
-                                // Ждем загрузки ВСЕХ серий
-                                Promise.all(promises).then(function(results) {
-                                    // Все данные загружены, формируем плейлист
-                                    var fullPlaylist = results;
-                                    
-                                    // Находим индекс текущей серии для старта
-                                    var currentIndex = items.findIndex(function(elem) {
-                                        return elem === element;
-                                    });
-                                    
-                                    // Передаем полный плейлист
-                                    Lampa.Player.play(fullPlaylist[currentIndex]);
-                                    Lampa.Player.playlist(fullPlaylist);
-                                    
-                                    console.log('Передан плейлист из', fullPlaylist.length, 'серий');
-                                });
+                        // Ждем загрузки ВСЕХ серий
+                        Promise.all(promises).then(function(fullPlaylist) {
+                            // Все данные загружены
+                            var currentIndex = items.findIndex(function(elem) {
+                                return elem === element;
+                            });
+                            
+                            // ПРОВЕРКА на циклические ссылки
+                            try {
+                                JSON.stringify(fullPlaylist);
+                                // Передаем полный плейлист
+                                Lampa.Player.play(fullPlaylist[currentIndex]);
+                                Lampa.Player.playlist(fullPlaylist);
+                                console.log('Передан плейлист из', fullPlaylist.length, 'серий');
+                            } catch(e) {
+                                console.error('Циклические ссылки обнаружены, передаем только текущую серию');
+                                Lampa.Player.play(first);
                             }
-                        } else {
-                            // Для фильмов
-                            Lampa.Player.play(first);
-                            Lampa.Player.playlist([first]);
-                        }
+                        });
+                    }
+                } else {
+                    // Для фильмов
+                    Lampa.Player.play(first);
+                    Lampa.Player.playlist([first]);
+                }
 
                         if (viewed.indexOf(hash_file) == -1) {
                             viewed.push(hash_file);
