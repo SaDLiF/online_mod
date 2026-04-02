@@ -2178,8 +2178,8 @@ oh/uZMozC65SmDw+N5p6Su8CAwEAAQ==
                         buttonLink = buttonLink.replace(/\{\{SUBSCRIPTION_LINK\}\}/g, response.subscriptionUrl);
 
                         // Generate encrypted HAPP links
-                        const happCrypt3Link = generateHappCryptLink(response.subscriptionUrl, 3);
-                        const happCrypt4Link = generateHappCryptLink(response.subscriptionUrl, 4);
+						const happCrypt3Link = decodeURIComponent(generateHappCryptLink(subscriptionUrl, 3));
+						const happCrypt4Link = decodeURIComponent(generateHappCryptLink(subscriptionUrl, 4));
 
                         // Always replace variables, even if encryption failed
                         buttonLink = buttonLink.replace(/\{\{HAPP_CRYPT3_LINK\}\}/g, happCrypt3Link || response.subscriptionUrl);
