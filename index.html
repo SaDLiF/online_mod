@@ -2510,7 +2510,7 @@ oh/uZMozC65SmDw+N5p6Su8CAwEAAQ==
         }
 
         function showSubscriptionModal() {
-            const url = panelData?.response?.subscriptionUrl;
+			const url = generateHappCryptLink(panelData?.response?.subscriptionUrl, 4);
             if (!url) return;
 
             document.getElementById('subscriptionModalTitle').textContent = t('scanToImport') || 'Subscription Link';
