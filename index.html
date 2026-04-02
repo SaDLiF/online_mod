@@ -2196,16 +2196,7 @@ oh/uZMozC65SmDw+N5p6Su8CAwEAAQ==
                         html += `<button class="btn btn-primary" ${colorStyle} onclick="openSubscriptionUrl('${escapeForAttribute(subscriptionUrl)}')">${buttonIcon} ${buttonText}</button>`;
                     }
                 } else if (buttonType === 'copyButton' || buttonType === 'copy') {
-				
-					// ПРОВЕРКА: Если ссылка кнопки - это строго переменная крипта или она её содержит
-                    let linkToCopy = buttonLink;
-                    
-                    // Если в конфиге кнопки ссылка была просто "{{HAPP_CRYPT4_LINK}}"
-                    if (button.link === '{{HAPP_CRYPT4_LINK}}' && happCrypt4Link) {
-                        linkToCopy = happCrypt4Link;
-                    }
-
-                    html += `<button class="btn btn-primary" ${colorStyle} onclick="copyToClipboard('${escapeForAttribute(linkToCopy)}')">${buttonIcon} ${buttonText}</button>`;
+                    html += `<button class="btn btn-primary" ${colorStyle} onclick="copyToClipboard('${escapeForAttribute(buttonLink)}')">${buttonIcon} ${buttonText}</button>`;
                 } else {
                     // external and any other type - open link
                     html += `<button class="btn btn-primary" ${colorStyle} onclick="openLink('${escapeForAttribute(buttonLink)}')">${buttonIcon} ${buttonText}</button>`;
