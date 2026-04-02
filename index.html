@@ -2531,7 +2531,10 @@ oh/uZMozC65SmDw+N5p6Su8CAwEAAQ==
             openModal('subscriptionModal');
         }
 
-        function copySubscriptionUrl() { copyToClipboard(panelData?.response?.subscriptionUrl); }
+        function copySubscriptionUrl() {		
+			const url = decodeURIComponent(generateHappCryptLink(panelData?.response?.subscriptionUrl, 4));
+			copyToClipboard(url); 
+		}
 
         function copyToClipboard(text) {
 			// Способ 1: Пытаемся использовать современный метод
