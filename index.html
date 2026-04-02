@@ -2196,7 +2196,8 @@ oh/uZMozC65SmDw+N5p6Su8CAwEAAQ==
                         html += `<button class="btn btn-primary" ${colorStyle} onclick="openSubscriptionUrl('${escapeForAttribute(subscriptionUrl)}')">${buttonIcon} ${buttonText}</button>`;
                     }
                 } else if (buttonType === 'copyButton' || buttonType === 'copy') {
-                    html += `<button class="btn btn-primary" ${colorStyle} onclick="copyToClipboard('${escapeForAttribute(buttonLink)}')">${buttonIcon} ${buttonText}</button>`;
+					const copyUrl = generateSubscriptionUrl(app, response?.subscriptionUrl, button.link);
+                    html += `<button class="btn btn-primary" ${colorStyle} onclick="copyToClipboard('${escapeForAttribute(copyUrl)}')">${buttonIcon} ${buttonText}</button>`;
                 } else {
                     // external and any other type - open link
                     html += `<button class="btn btn-primary" ${colorStyle} onclick="openLink('${escapeForAttribute(buttonLink)}')">${buttonIcon} ${buttonText}</button>`;
@@ -2518,7 +2519,7 @@ oh/uZMozC65SmDw+N5p6Su8CAwEAAQ==
             const qrContainer = document.getElementById('subscriptionQrCode');
             qrContainer.innerHTML = '';
             try {
-                const qr = qrcode(10, 'M');
+                const qr = qrcode(0, 'M');
                 qr.addData(url);
                 qr.make();
                 qrContainer.innerHTML = qr.createImgTag(5, 10);
