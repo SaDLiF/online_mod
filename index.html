@@ -2533,11 +2533,58 @@ oh/uZMozC65SmDw+N5p6Su8CAwEAAQ==
         function copySubscriptionUrl() { copyToClipboard(panelData?.response?.subscriptionUrl); }
 
         function copyToClipboard(text) {
-            if (!text) return;
-            navigator.clipboard.writeText(text)
-                .then(() => showToast(t('linkCopied') || 'Copied!'))
-                .catch(err => console.error('Could not copy text: ', err));
-        }
+			// Способ 1: Пытаемся использовать современный метод
+			if (navigator.clipboard && window.isSecureContext) {
+				navigator.clipboard.writeText(text).then(() => {
+					showToast('Скопировано!');
+				}).catch(err => {
+					// Если современный метод выдал ошибку, пробуем старый способ
+					fallbackCopyToClipboard(text);
+				});
+			} else {
+				// Если современный метод вообще не поддерживается (например, нет HTTPS)
+				fallbackCopyToClipboard(text);
+			}
+		}
+
+		// Резервный метод для мобилок и старых браузеров
+		function fallbackCopyToClipboard(text) {
+			const textArea = document.createElement("textarea");
+			textArea.value = text;
+			
+			// Делаем элемент невидимым, но оставляем в DOM
+			textArea.style.position = "fixed";
+			textArea.style.left = "-999999px";
+			textArea.style.top = "-999999px";
+			document.body.appendChild(textArea);
+			
+			textArea.focus();
+			textArea.select();
+			
+			// Для iOS (Safari) нужно дополнительно выделить текст через range
+			if (navigator.userAgent.match(/ipad|iphone/i)) {
+				const range = document.createRange();
+				range.selectNodeContents(textArea);
+				const selection = window.getSelection();
+				selection.removeAllRanges();
+				selection.addRange(range);
+				textArea.setSelectionRange(0, 999999);
+			}
+
+			try {
+				const successful = document.execCommand('copy');
+				if (successful) {
+					showToast('Скопировано!');
+				} else {
+					alert('Не удалось скопировать ссылку автоматически.');
+				}
+			} catch (err) {
+				console.error('Fallback: Ошибка копирования', err);
+				alert('Ошибка при копировании.');
+			}
+
+			document.body.removeChild(textArea);
+		}
 
         function showToast(message) {
             if (toastTimeout) clearTimeout(toastTimeout);
